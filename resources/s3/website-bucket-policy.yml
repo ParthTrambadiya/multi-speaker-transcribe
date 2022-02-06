@@ -1,0 +1,13 @@
+DependsOn: OriginAccessIdentity
+Type: AWS::S3::BucketPolicy
+Properties:
+  Bucket: !Ref S3SiteBucket
+  PolicyDocument:
+    Id: OriginBucketPolicy
+    Version: '2012-10-17'
+    Statement:
+      - Effect: Allow
+        Principal:
+          CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
+        Action: 's3:GetObject'
+        Resource: !Sub 'arn:aws:s3:::${S3SiteBucket}/*'

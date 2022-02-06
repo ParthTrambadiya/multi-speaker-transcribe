@@ -1,0 +1,19 @@
+{
+  "name": "transvoice",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "s3-sync": "aws s3 sync app/ ",
+    "s3-clean": "aws s3 rm --recursive ",
+    "cf-invalidate": "aws cloudfront create-invalidation --path /* --distribution-id "
+  },
+  "author": "Parth Trambadiya",
+  "license": "ISC",
+  "dependencies": {
+    "serverless-export-env": "^2.0.0",
+    "serverless-iam-roles-per-function": "^3.2.0",
+    "serverless-stack-output": "^0.2.3"
+  }
+}

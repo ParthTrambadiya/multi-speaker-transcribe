@@ -1,0 +1,24 @@
+Type: AWS::Cognito::UserPoolClient
+Properties:
+  ClientName: web
+  UserPoolId: !Ref CognitoUserPool
+  ExplicitAuthFlows:
+    - ALLOW_USER_SRP_AUTH
+    - ALLOW_USER_PASSWORD_AUTH
+    - ALLOW_REFRESH_TOKEN_AUTH
+  PreventUserExistenceErrors: ENABLED
+  AllowedOAuthFlowsUserPoolClient: True
+  SupportedIdentityProviders:
+    - COGNITO
+  CallbackURLs:
+    - !Join ["", ["https://", !GetAtt CloudFrontDistribution.DomainName, "/upload.html"]]
+  LogoutURLs:
+    - !Join ["", ["https://", !GetAtt CloudFrontDistribution.DomainName]]
+  AllowedOAuthFlows:
+    - implicit
+  AllowedOAuthScopes:
+    - email
+    - openid
+    - profile
+    - aws.cognito.signin.user.admin
+    - phone

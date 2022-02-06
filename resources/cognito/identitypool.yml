@@ -1,0 +1,12 @@
+Type: AWS::Cognito::IdentityPool
+Properties: 
+  IdentityPoolName: ${self:service}-IdentityPool-${self:provider.stage}
+  AllowClassicFlow: False
+  AllowUnauthenticatedIdentities: False
+  CognitoIdentityProviders:
+    - ClientId: !Ref WebUserPoolClient
+      ProviderName: 
+        !Join
+          - ''
+          - - cognito-idp.${self:provider.region}.amazonaws.com/
+            - !Ref CognitoUserPool

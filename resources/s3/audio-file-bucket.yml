@@ -1,0 +1,18 @@
+Type: AWS::S3::Bucket
+Properties:
+  BucketName: ${self:service}-audio-file-bucket-${self:provider.stage}
+  PublicAccessBlockConfiguration:
+    BlockPublicAcls: true
+    BlockPublicPolicy: true
+    IgnorePublicAcls: true
+    RestrictPublicBuckets: true
+  CorsConfiguration:
+    CorsRules:
+      - AllowedHeaders:
+          - "*"
+        AllowedMethods:
+          - PUT
+        AllowedOrigins:
+          - '*'
+        Id: myCORSRuleId2
+        MaxAge: 3600

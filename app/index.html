@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="./assets/logo.png">
+    <title>Home</title>
+
+    <script type = "text/javascript" >  
+        history.pushState(null, null, location.href);
+        window.onpopstate = function () {
+            history.go(1);
+        };
+        sessionStorage.clear(); 
+    </script>
+    
+    <!--Custom CSS-->
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <section class="banner">
+        <header>
+            <a href="#" class="logo"><img src="./assets/logo.png"> TransVoice</a>
+        </header>
+        <div class="content">
+            <div class="contentBx">
+                <h2>Multi-Speaker Transcribe</h2>
+                <p>
+                    Most people are living, working and learning on-the-go. With multiple deadlines, 
+                    creative personal projects and more to juggle, it’s important to be efficient with 
+                    your time and energy. Apps are one of the keys to mobility and efficiency in your work. 
+                    If you haven’t tried using an app for text transcription, we recommend it.
+                </p>
+                <p>
+                    To experience the best transcription services without any restriction and for free, you 
+                    have to just click on the <b>TRANSCRIBE NOW</b> button given below.
+                </p>
+                <a href="" id="home-login">Transcribe Now</a>
+            </div>
+            <div class="imgBx">
+                <img src="./assets/banner.gif">
+            </div>
+        </div>
+    </section>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" integrity="sha512-894YE6QWD5I59HgZOGReFYm4dnWc1Qt5NtvYSaNcOP+u1T9qYdvdihz0PPSiiqn/+/3e7Jo4EaG7TubfWGUrMQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="./js/main.js"></script>
+</body>
+</html>

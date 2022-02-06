@@ -1,0 +1,57 @@
+Type: AWS::IAM::Role
+Properties:
+  RoleName: ${self:service}-auth-role-${self:provider.stage}
+  AssumeRolePolicyDocument:
+    Version: "2012-10-17"
+    Statement:
+      - Effect: Allow
+        Principal:
+          Federated:
+            - cognito-identity.amazonaws.com
+        Action:
+          - sts:AssumeRoleWithWebIdentity
+        Condition:
+          StringEquals:
+            cognito-identity.amazonaws.com:aud: !Ref CognitoIdentityPool
+          ForAnyValue:StringLike: 
+            cognito-identity.amazonaws.com:amr: authenticated
+  Policies:
+    - PolicyName: ${self:service}-auth-role-general-policy-${self:provider.stage}
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: 
+              - mobileanalytics:PutEvents
+              - cognito-sync:*
+              - cognito-identity:*
+            Resource:
+              - "*"
+    - PolicyName: ${self:service}-auth-role-s3-policy-${self:provider.stage}
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: 
+              - s3:*
+            Resource:
+              - !GetAtt AudioFileBucket.Arn
+              - !Join
+                  - ''
+                  - - !GetAtt AudioFileBucket.Arn
+                    - '/*'
+              - !GetAtt JsonFileBucket.Arn
+              - !Join
+                  - ''
+                  - - !GetAtt JsonFileBucket.Arn
+                    - '/*'
+              - !GetAtt CsvFileBucket.Arn
+              - !Join
+                  - ''
+                  - - !GetAtt CsvFileBucket.Arn
+                    - '/*'
+              - !GetAtt PdfFileBucket.Arn
+              - !Join
+                  - ''
+                  - - !GetAtt PdfFileBucket.Arn
+                    - '/*'

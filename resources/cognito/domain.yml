@@ -1,0 +1,4 @@
+Type: AWS::Cognito::UserPoolDomain
+Properties:
+  Domain: ${self:custom.cognito-domain-name}
+  UserPoolId: !Ref CognitoUserPool

@@ -1,0 +1,46 @@
+Type: AWS::CloudFront::Distribution
+Properties:
+  DistributionConfig:
+    Origins:
+      - DomainName: ${self:custom.website-s3-bucket}.s3.amazonaws.com
+        Id: transvoiceS3Origin
+        S3OriginConfig:
+            OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${OriginAccessIdentity}'
+    Enabled: true
+    Comment: 'TransVoice static website distribution'
+    DefaultRootObject: index.html
+    DefaultCacheBehavior:
+      TargetOriginId: transvoiceS3Origin
+      ViewerProtocolPolicy: https-only
+      Compress: true
+      DefaultTTL: 10
+      MaxTTL: 10
+      AllowedMethods:
+        - GET
+        - HEAD
+        - DELETE
+        - OPTIONS
+        - PATCH
+        - POST
+        - PUT
+      CachedMethods:
+        - GET
+        - HEAD
+        - OPTIONS
+      ForwardedValues:
+        Headers:
+          - Accept
+          - Referer
+          - Authorization
+          - Content-Type
+        QueryString: true
+    CacheBehaviors:
+      - PathPattern: '*'
+        TargetOriginId: transvoiceS3Origin
+        ViewerProtocolPolicy: redirect-to-https
+        ForwardedValues:
+            QueryString: false
+    PriceClass: 'PriceClass_100'
+    ViewerCertificate:
+      CloudFrontDefaultCertificate: True
+      MinimumProtocolVersion: TLSv1.2_2018

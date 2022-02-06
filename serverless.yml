@@ -1,0 +1,576 @@
+service: transvoice
+frameworkVersion: '2'
+
+plugins:
+  - serverless-export-env
+  - serverless-iam-roles-per-function
+  - serverless-stack-output
+
+custom:
+  website-s3-bucket: ${file(./config.${self:provider.stage}.json):WEBSITE_S3_BUCKET}
+  cognito-domain-name: ${file(./config.${self:provider.stage}.json):COGNITO_DOMAIN}
+  output:
+    file: ./app/stack-output.json
+
+provider:
+  name: aws
+  runtime: python3.8
+  lambdaHashingVersion: 20201221
+  stage: ${opt:stage, 'prod'}
+  region: ${opt:region, 'us-east-1'}
+
+package:
+  patterns:
+    - '!node_modules'
+    - '!app'
+  individually: true
+
+functions:
+  confirmUserSignup:
+    name: ${self:service}-user-confirm-signup-${self:provider.stage}
+    handler: functions/confirm_user_signup.lambda_handler
+    environment:
+      USERS_TABLE: !Ref DynamoDBUsersTable
+    iamRoleStatements:
+      - Effect: Allow
+        Action: dynamodb:PutItem
+        Resource: !GetAtt DynamoDBUsersTable.Arn
+  customEmailVerification:
+    name: ${self:service}-custom-email-vertification-${self:provider.stage}
+    handler: functions/custom_verification_email.lambda_handler
+  audioToJsonConvert:
+    name: ${self:service}-audio-to-json-${self:provider.stage}
+    handler: functions/audio_to_json_convert.lambda_handler
+    environment:
+      AUDIO_BUCKET: !Ref AudioFileBucket
+      JSON_BUCKET: !Ref JsonFileBucket
+    iamRoleStatements:
+      - Effect: Allow
+        Action: 
+          - s3:PutObject
+          - s3:GetObject
+          - s3:List*
+          - s3:GetBucketLocation
+        Resource: 
+          - !GetAtt AudioFileBucket.Arn
+          - !Join
+              - ''
+              - - !GetAtt AudioFileBucket.Arn
+                - '/*'
+          - !GetAtt JsonFileBucket.Arn
+          - !Join
+              - ''
+              - - !GetAtt JsonFileBucket.Arn
+                - '/*'
+      - Effect: Allow
+        Action: 
+          - transcribe:StartTranscriptionJob
+          - transcribe:GetTranscriptionJob
+          - transcribe:DeleteTranscriptionJob
+        Resource: '*'
+    events:
+      - s3:
+          bucket: !Ref AudioFileBucket
+          event: s3:ObjectCreated:*
+          rules:
+            - suffix: .wav
+          existing: true
+  jsonToCsvConvert:
+    name: ${self:service}-json-to-csv-${self:provider.stage}
+    handler: functions/json_to_csv_convert.lambda_handler
+    environment:
+      JSON_BUCKET: !Ref JsonFileBucket
+      CSV_BUCKET: !Ref CsvFileBucket
+    iamRoleStatements:
+      - Effect: Allow
+        Action: 
+          - s3:PutObject
+          - s3:GetObject
+          - s3:List*
+          - s3:GetBucketLocation
+        Resource: 
+          - !GetAtt JsonFileBucket.Arn
+          - !Join
+              - ''
+              - - !GetAtt JsonFileBucket.Arn
+                - '/*'
+          - !GetAtt CsvFileBucket.Arn
+          - !Join
+              - ''
+              - - !GetAtt CsvFileBucket.Arn
+                - '/*'
+    events:
+      - s3:
+          bucket: !Ref JsonFileBucket
+          event: s3:ObjectCreated:*
+          rules:
+            - suffix: .json
+          existing: true
+
+resources:
+  Resources:
+    S3SiteBucket:
+      # ${file(./resources/s3/website-bucket.yml)}
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.website-s3-bucket}
+        WebsiteConfiguration:
+          IndexDocument: index.html
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        CorsConfiguration:
+          CorsRules:
+            - AllowedMethods:
+                - GET
+              AllowedOrigins:
+                - '*'
+              ExposedHeaders:
+                - Date
+              Id: myCORSRuleId1
+              MaxAge: 3600
+          
+    OriginAccessIdentity:
+      # ${file(./resources/cloudfront/oai.yml)}
+      Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+      Properties:
+        CloudFrontOriginAccessIdentityConfig:
+          Comment: !Sub 'OriginAccessIdentity for ${S3SiteBucket}'
+
+    BucketPolicy:
+      # ${file(./resources/s3/website-bucket-policy.yml)}
+      DependsOn: OriginAccessIdentity
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref S3SiteBucket
+        PolicyDocument:
+          Id: OriginBucketPolicy
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
+              Action: 's3:GetObject'
+              Resource: !Sub 'arn:aws:s3:::${S3SiteBucket}/*'
+
+    CloudFrontDistribution:
+      # ${file(./resources/cloudfront/distribution.yml)}
+      Type: AWS::CloudFront::Distribution
+      Properties:
+        DistributionConfig:
+          Origins:
+            - DomainName: ${self:custom.website-s3-bucket}.s3.amazonaws.com
+              Id: transvoiceS3Origin
+              S3OriginConfig:
+                  OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${OriginAccessIdentity}'
+          Enabled: true
+          Comment: 'TransVoice static website distribution'
+          DefaultRootObject: index.html
+          DefaultCacheBehavior:
+            TargetOriginId: transvoiceS3Origin
+            ViewerProtocolPolicy: https-only
+            Compress: true
+            DefaultTTL: 10
+            MaxTTL: 10
+            AllowedMethods:
+              - GET
+              - HEAD
+              - DELETE
+              - OPTIONS
+              - PATCH
+              - POST
+              - PUT
+            CachedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            ForwardedValues:
+              Headers:
+                - Accept
+                - Referer
+                - Authorization
+                - Content-Type
+              QueryString: true
+          CacheBehaviors:
+            - PathPattern: '*'
+              TargetOriginId: transvoiceS3Origin
+              ViewerProtocolPolicy: redirect-to-https
+              ForwardedValues:
+                  QueryString: false
+          PriceClass: 'PriceClass_100'
+          ViewerCertificate:
+            CloudFrontDefaultCertificate: True
+            MinimumProtocolVersion: TLSv1.2_2018
+
+    DynamoDBUsersTable:
+      # ${file(./resources/dynamodb/usertable.yml)}
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-user-table-${self:provider.stage}
+        BillingMode: PAY_PER_REQUEST
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+    
+    CognitoUserPool:
+      # ${file(./resources/cognito/userpool.yml)}
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: ${self:service}-UserPool-${self:provider.stage}
+        Schema:
+          - AttributeDataType: String
+            Name: name
+            Required: True
+            Mutable: True
+          - AttributeDataType: String
+            Name: email
+            Required: True
+            Mutable: False
+        AutoVerifiedAttributes:
+          - email
+        UsernameConfiguration:
+          CaseSensitive: False
+        UsernameAttributes:
+          - email
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 10
+            RequireLowercase: True
+            RequireUppercase: True
+            RequireNumbers: True
+            RequireSymbols: True
+        AccountRecoverySetting:
+          RecoveryMechanisms:
+            - Name: verified_email
+              Priority: 1
+        EmailConfiguration:
+          EmailSendingAccount: COGNITO_DEFAULT
+        VerificationMessageTemplate:
+          DefaultEmailOption: CONFIRM_WITH_CODE
+        LambdaConfig:
+          PostConfirmation: !GetAtt ConfirmUserSignupLambdaFunction.Arn
+          CustomMessage: !GetAtt CustomEmailVerificationLambdaFunction.Arn
+    
+    CognitoUserPoolDomain:
+      # ${file(./resources/cognito/domain.yml)}
+      Type: AWS::Cognito::UserPoolDomain
+      Properties:
+        Domain: ${self:custom.cognito-domain-name}
+        UserPoolId: !Ref CognitoUserPool
+
+    WebUserPoolClient:
+      # ${file(./resources/cognito/webclient.yml)}
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: web
+        UserPoolId: !Ref CognitoUserPool
+        ExplicitAuthFlows:
+          - ALLOW_USER_SRP_AUTH
+          - ALLOW_USER_PASSWORD_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+        PreventUserExistenceErrors: ENABLED
+        AllowedOAuthFlowsUserPoolClient: True
+        SupportedIdentityProviders:
+          - COGNITO
+        CallbackURLs:
+          - !Join ["", ["https://", !GetAtt CloudFrontDistribution.DomainName, "/upload.html"]]
+        LogoutURLs:
+          - !Join ["", ["https://", !GetAtt CloudFrontDistribution.DomainName]]
+        AllowedOAuthFlows:
+          - implicit
+        AllowedOAuthScopes:
+          - email
+          - openid
+          - profile
+          - aws.cognito.signin.user.admin
+          - phone
+
+    UserPoolInvokeConfirmUserSignupLambdaPermission:
+      # ${file(./resources/lambda/user-signup-permission.yml)}
+      Type: AWS::Lambda::Permission
+      Properties:
+        Action: lambda:invokeFunction
+        FunctionName: !Ref ConfirmUserSignupLambdaFunction
+        Principal: cognito-idp.amazonaws.com
+        SourceArn: !GetAtt CognitoUserPool.Arn
+    
+    UserPoolInvokeCustomEMailVerificationLambdaPermission:
+      # ${file(./resources/lambda/custom-email-permission.yml)}
+      Type: AWS::Lambda::Permission
+      Properties:
+        Action: lambda:invokeFunction
+        FunctionName: !Ref CustomEmailVerificationLambdaFunction
+        Principal: cognito-idp.amazonaws.com
+        SourceArn: !GetAtt CognitoUserPool.Arn
+
+    CognitoIdentityPool:
+      # ${file(./resources/cognito/identitypool.yml)}
+      Type: AWS::Cognito::IdentityPool
+      Properties: 
+        IdentityPoolName: ${self:service}-IdentityPool-${self:provider.stage}
+        AllowClassicFlow: False
+        AllowUnauthenticatedIdentities: False
+        CognitoIdentityProviders:
+          - ClientId: !Ref WebUserPoolClient
+            ProviderName: 
+              !Join
+                - ''
+                - - cognito-idp.${self:provider.region}.amazonaws.com/
+                  - !Ref CognitoUserPool
+    
+    IdentityPoolRoleMapper:
+      # ${file(./resources/cognito/role-mapper.yml)}
+      Type: AWS::Cognito::IdentityPoolRoleAttachment
+      Properties: 
+        IdentityPoolId: !Ref CognitoIdentityPool
+        RoleMappings:
+          cognitoProvider:
+            IdentityProvider:
+              !Join
+                - ''
+                - - cognito-idp.${self:provider.region}.amazonaws.com/
+                  - !Ref CognitoUserPool
+                  - ':'
+                  - !Ref WebUserPoolClient
+            Type: Token
+            AmbiguousRoleResolution: AuthenticatedRole
+        Roles:
+          authenticated: !GetAtt IamAuthRole.Arn
+          unauthenticated: !GetAtt IamUnAuthRole.Arn
+
+    IamAuthRole:
+      # ${file(./resources/iam/auth-role.yml)}
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-auth-role-${self:provider.stage}
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Federated:
+                  - cognito-identity.amazonaws.com
+              Action:
+                - sts:AssumeRoleWithWebIdentity
+              Condition:
+                StringEquals:
+                  cognito-identity.amazonaws.com:aud: !Ref CognitoIdentityPool
+                ForAnyValue:StringLike: 
+                  cognito-identity.amazonaws.com:amr: authenticated
+        Policies:
+          - PolicyName: ${self:service}-auth-role-general-policy-${self:provider.stage}
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action: 
+                    - mobileanalytics:PutEvents
+                    - cognito-sync:*
+                    - cognito-identity:*
+                  Resource:
+                    - "*"
+          - PolicyName: ${self:service}-auth-role-s3-policy-${self:provider.stage}
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action: 
+                    - s3:*
+                  Resource:
+                    - !GetAtt AudioFileBucket.Arn
+                    - !Join
+                        - ''
+                        - - !GetAtt AudioFileBucket.Arn
+                          - '/*'
+                    - !GetAtt JsonFileBucket.Arn
+                    - !Join
+                        - ''
+                        - - !GetAtt JsonFileBucket.Arn
+                          - '/*'
+                    - !GetAtt CsvFileBucket.Arn
+                    - !Join
+                        - ''
+                        - - !GetAtt CsvFileBucket.Arn
+                          - '/*'
+                    - !GetAtt PdfFileBucket.Arn
+                    - !Join
+                        - ''
+                        - - !GetAtt PdfFileBucket.Arn
+                          - '/*'
+    
+    IamUnAuthRole:
+      # ${file(./resources/iam/unauth-role.yml)}
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-unauth-role-${self:provider.stage}
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Federated:
+                  - cognito-identity.amazonaws.com
+              Action:
+                - sts:AssumeRoleWithWebIdentity
+              Condition:
+                StringEquals:
+                  cognito-identity.amazonaws.com:aud: !Ref CognitoIdentityPool
+                ForAnyValue:StringLike: 
+                  cognito-identity.amazonaws.com:amr: authenticated
+        Policies:
+          - PolicyName: ${self:service}-unauth-role-general-policy-${self:provider.stage}
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action: 
+                    - mobileanalytics:PutEvents
+                    - cognito-sync:*
+                    - cognito-identity:*
+                  Resource:
+                    - "*"
+
+    AudioFileBucket:
+      # ${file(./resources/s3/audio-file-bucket.yml)}
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:service}-audio-file-bucket-${self:provider.stage}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders:
+                - "*"
+              AllowedMethods:
+                - PUT
+              AllowedOrigins:
+                - '*'
+              Id: myCORSRuleId2
+              MaxAge: 3600
+    
+    JsonFileBucket:
+      # ${file(./resources/s3/json-file-bucket.yml)}
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:service}-json-file-bucket-${self:provider.stage}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+    
+    CsvFileBucket:
+      # ${file(./resources/s3/csv-file-bucket.yml)}
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:service}-csv-file-bucket-${self:provider.stage}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders:
+                - "*"
+              AllowedMethods:
+                - GET
+                - HEAD
+              AllowedOrigins:
+                - '*'
+              Id: myCORSRuleId3
+              MaxAge: 3600
+
+    PdfFileBucket:
+      # ${file(./resources/s3/pdf-file-bucket.yml)}
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:service}-pdf-file-bucket-${self:provider.stage}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders:
+                - "*"
+              AllowedMethods:
+                - PUT
+                - GET
+                - HEAD
+                - DELETE
+              AllowedOrigins:
+                - '*'
+              Id: myCORSRuleId4
+              MaxAge: 3600
+
+  Outputs:
+    StackName:
+      Description: This is your cloudformation stack name
+      Value: ${self:service}
+    StackRegion:
+      Description: This is your cloudformation stack region
+      Value: ${self:provider.region}
+    StackStage:
+      Description: This is your cloudformation stack stage, 'dev' is default
+      Value: ${self:provider.stage}
+    WebsiteBucketName:
+      Value: !Ref S3SiteBucket
+    CloudFrontDistroUrl:
+      Value: 
+        !Join
+        - ''
+        - - 'https://'
+          - !GetAtt CloudFrontDistribution.DomainName
+    CloudFrontId:
+      Description: This is your cloudfront ID
+      Value: !GetAtt CloudFrontDistribution.Id
+    UserPoolDomain:
+      Description: This is your cognito user pool domain
+      Value: !Sub 'https://${CognitoUserPoolDomain}.auth.${self:provider.region}.amazoncognito.com'
+    CognitoUserPoolId:
+      Description: This is your cognito user pool ID
+      Value: !Ref CognitoUserPool
+    CognitoWebClientId:
+      Description: This is your cognito user pool wed client ID
+      Value: !Ref WebUserPoolClient
+    CognitoUserPoolSigninUrl:
+      Description: This is your cognito user pool sign-in url
+      Value: !Sub 'https://${CognitoUserPoolDomain}.auth.${self:provider.region}.amazoncognito.com/login?response_type=token&client_id=${WebUserPoolClient}&redirect_uri=https://${CloudFrontDistribution.DomainName}/upload.html'
+    CognitoUserPoolSignupUrl:
+      Description: This is your cognito user pool sign-up url
+      Value: !Sub 'https://${CognitoUserPoolDomain}.auth.${self:provider.region}.amazoncognito.com/signup?response_type=token&client_id=${WebUserPoolClient}&redirect_uri=https://${CloudFrontDistribution.DomainName}/upload.html'
+    CognitoUserPoolLogoutUrl:
+      Description: This is your cognito user pool logout url
+      Value: !Sub 'https://${CognitoUserPoolDomain}.auth.${self:provider.region}.amazoncognito.com/logout?client_id=${WebUserPoolClient}&logout_uri=https://${CloudFrontDistribution.DomainName}'
+    CognitoIdentityPoolId:
+      Description: This is your identity pool id
+      Value: !Ref CognitoIdentityPool
+    CognitoIdentityProvider:
+      Description: This is your congito identity provider
+      Value: 
+          !Join
+            - ''
+            - - cognito-idp.${self:provider.region}.amazonaws.com/
+              - !Ref CognitoUserPool
+    S3AudioBucket:
+      Description: This is your audio file bucket name
+      Value: !Ref AudioFileBucket
+    S3JsonBucket:
+      Description: This is your json file bucket name
+      Value: !Ref JsonFileBucket
+    S3CsvBucket:
+      Description: This is your csv file bucket name
+      Value: !Ref CsvFileBucket
+    S3PdfBucket:
+      Description: This is your pdf file bucket name
+      Value: !Ref PdfFileBucket

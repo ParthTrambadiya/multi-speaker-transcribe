@@ -1,0 +1,20 @@
+Type: AWS::S3::Bucket
+Properties:
+  BucketName: ${self:custom.website-s3-bucket}
+  WebsiteConfiguration:
+    IndexDocument: index.html
+  PublicAccessBlockConfiguration:
+    BlockPublicAcls: true
+    BlockPublicPolicy: true
+    IgnorePublicAcls: true
+    RestrictPublicBuckets: true
+  CorsConfiguration:
+    CorsRules:
+      - AllowedMethods:
+          - GET
+        AllowedOrigins:
+          - '*'
+        ExposedHeaders:
+          - Date
+        Id: myCORSRuleId1
+        MaxAge: 3600

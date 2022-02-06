@@ -28,7 +28,7 @@ Most people are living, working and learning on-the-go. With multiple deadlines,
 
 ## Demo
 - Visit the link: https://d3jifa623bta1b.cloudfront.net
-- For test audio file you can download from <a href="./app/docs/medical-diarization.wav" download="medical-diarization.wav" class="download-cv">here</a>.
+- For test audio file you can download from [here](https://github.com/ParthTrambadiya/multi-speaker-transcribe/raw/master/app/docs/medical-diarization.wav).
 ## Implementation
 ### Prerequisite
 - Node

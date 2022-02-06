@@ -26,6 +26,9 @@ Most people are living, working and learning on-the-go. With multiple deadlines,
 - Once the CSV file available in `S3 Bucket`, we will have CSV file content at website page using `AWS SDK for Javascript`.
 - From the UI we download PDF file and that PDF file will upload to `S3 Bucket`.
 
+## Demo
+- Visit the link: https://d3jifa623bta1b.cloudfront.net
+- For test audio file you can download from <a href="./app/docs/medical-diarization.wav" download="medical-diarization.wav" class="download-cv">here</a>.
 ## Implementation
 ### Prerequisite
 - Node

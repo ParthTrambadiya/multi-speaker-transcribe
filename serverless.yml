@@ -23,6 +23,9 @@ package:
   patterns:
     - '!node_modules'
     - '!app'
+    - '!resources'
+    - '!*.json'
+    - '!*.md'
   individually: true
 
 functions:

@@ -132,7 +132,7 @@ resources:
                 - '*'
               ExposedHeaders:
                 - Date
-              Id: myCORSRuleId1
+              Id: myDevCORSRuleId1
               MaxAge: 3600
           
     OriginAccessIdentity:
@@ -149,7 +149,7 @@ resources:
       Properties:
         Bucket: !Ref S3SiteBucket
         PolicyDocument:
-          Id: OriginBucketPolicy
+          Id: OriginBucketPolicyDev
           Version: '2012-10-17'
           Statement:
             - Effect: Allow
@@ -165,14 +165,14 @@ resources:
         DistributionConfig:
           Origins:
             - DomainName: ${self:custom.website-s3-bucket}.s3.amazonaws.com
-              Id: transvoiceS3Origin
+              Id: transvoiceS3OriginDev
               S3OriginConfig:
                   OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${OriginAccessIdentity}'
           Enabled: true
           Comment: 'TransVoice static website distribution'
           DefaultRootObject: index.html
           DefaultCacheBehavior:
-            TargetOriginId: transvoiceS3Origin
+            TargetOriginId: transvoiceS3OriginDev
             ViewerProtocolPolicy: https-only
             Compress: true
             DefaultTTL: 10
@@ -198,7 +198,7 @@ resources:
               QueryString: true
           CacheBehaviors:
             - PathPattern: '*'
-              TargetOriginId: transvoiceS3Origin
+              TargetOriginId: transvoiceS3OriginDev
               ViewerProtocolPolicy: redirect-to-https
               ForwardedValues:
                   QueryString: false

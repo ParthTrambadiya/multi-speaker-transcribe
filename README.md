@@ -20,7 +20,7 @@ Most people are living, working and learning on-the-go. With multiple deadlines,
 - The Amazon S3 PUT event triggers the `AWS Lambda function`.
 - The function invokes an asynchronous Amazon Transcribe API call on the uploaded audio file.
 - The transcription job runs and writes the output in JSON format to the target `S3 bucket`.
-- Target `S3 Bucket` triggerss PUT event and invoke `AWS Lambda function`.
+- Target `S3 Bucket` triggers PUT event and invoke `AWS Lambda function`.
 - That invoked lambda function get JSON file and convert that file into the CSV file and upload to `S3 Bucket`.
 - In website's Javascript code, continuously check for CSV file in every 1 minutes interval.
 - Once the CSV file available in `S3 Bucket`, we will have CSV file content at website page using `AWS SDK for Javascript`.
@@ -33,19 +33,24 @@ Most people are living, working and learning on-the-go. With multiple deadlines,
 ### Prerequisite
 - Node
 - Serverless Framework must be installed on your machine https://www.serverless.com/
+- AWS CLI must be installed in your machine and credentials must be setup.
 
 ### Follow the below steps to deploy on the AWS Cloud
 1. Clone this repo.
 2. Install dependencies using `npm install`.
-3. Change config file with this name `config.stage.json`. Stage will be your appication stage e.g. `dev`, `test` or `prod`.
+3. Change config file with this name `config.stage.json`. Stage will be your application stage e.g. `dev`, `test` or `prod`.
 4. Write unique name of your `bucket` in config file. 
-5. Write unique domain of your `cognito` in config file. 
+5. Write unique domain of your `cognito` in config file `Note: `Do not enter your entire domain for cognito domain, e.g. enter only `transvoice` instead of `transvoice.com`, because once you deployed stack you will get `https://your_cognito_domain.auth.region.amazoncognito.com` as cognito domain.
 
 At the end run the below command.
 ```
 serverless deploy --region <aws-region> --stage <stage>
 ```
-
+Now, run the below command to deploy your website on S3 bucket.
+```
+npm run s3-sync s3://<bucket-name>
+```
+  
 To access website, CloudFront URL will be available in `stack-output.json` file in app `folder`.
 
 ### Follow the below steps to remove from the AWS Cloud

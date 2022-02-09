@@ -27,7 +27,7 @@ Most people are living, working and learning on-the-go. With multiple deadlines,
 - From the UI we download PDF file and that PDF file will upload to `S3 Bucket`.
 
 ## Demo
-- Visit the link: https://d3jifa623bta1b.cloudfront.net
+- Visit the link: https://d3o9h2o9kfficd.cloudfront.net
 - For test audio file you can download from [here](https://github.com/ParthTrambadiya/multi-speaker-transcribe/raw/master/app/docs/medical-diarization.wav).
 ## Implementation
 ### Prerequisite
@@ -50,7 +50,12 @@ Now, run the below command to deploy your website on S3 bucket.
 ```
 npm run s3-sync s3://<bucket-name>
 ```
-  
+
+Suppose, you have done some changes in UI and you want to reflect those changes immediately on website then you need to first sync files with s3 by running the above command and invalidate cache in cloudfront using the below command.
+```
+npm run cf-invalidate <cloudfront-id>
+``` 
+
 To access website, CloudFront URL will be available in `stack-output.json` file in app `folder`.
 
 ### Follow the below steps to remove from the AWS Cloud

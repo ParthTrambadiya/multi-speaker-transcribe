@@ -5,7 +5,7 @@ Most people are living, working and learning on-the-go. With multiple deadlines,
 - HTML, CSS, Bootstrap, JavaScript, JQuery, AWS, Python, Serverless Framework
 
 ## Architecture
-![This is an image](./app/docs/Architecture.png)
+![This is an image](https://github.com/ParthTrambadiya/multi-speaker-transcribe/raw/master/app/docs/Architecture.png)
 
 - It's a fully serverless web application, built with AWS Serverless Technology.
 - In the above architecture, used AWS services are Amazon CloudFront, Amazon S3 Bucket, Amazon Cognito, AWS Lambda, Amazon Transcribe, Identity and Access Management, Amazon CloudWatch.
